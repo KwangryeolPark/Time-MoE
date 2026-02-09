@@ -3,10 +3,11 @@
 """
 Example script demonstrating how to extract latent representations from Time-MoE model.
 
-This script shows three different ways to obtain latent representations:
+This script shows four different ways to obtain latent representations:
 1. Using the convenient encode() method
 2. Using the forward() method with output_hidden_states=True
 3. Using the generate() method with output_hidden_states=True
+4. Common use cases for latent representations (similarity, clustering, classification, etc.)
 """
 
 import torch
