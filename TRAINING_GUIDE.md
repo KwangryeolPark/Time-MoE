@@ -6,6 +6,7 @@ This guide explains how to load pretrained checkpoints, perform self-supervised 
 1. [Loading Pretrained Checkpoints](#1-loading-pretrained-checkpoints)
 2. [Self-Supervised Learning (Continued Pretraining)](#2-self-supervised-learning-continued-pretraining)
 3. [Fine-tuning](#3-fine-tuning)
+   - [Parameter-Efficient Fine-tuning with LoRA](#33-parameter-efficient-fine-tuning-with-lora)
 4. [Checkpoint Management](#4-checkpoint-management)
 
 ---
@@ -203,7 +204,104 @@ python torch_dist_run.py main.py \
 | Epochs | 1-3 | 3-10 (more) |
 | Stride | 512, 1024 (data efficiency) | 1 (use all samples) |
 
-### 3.3 Fine-tuning from Local Checkpoint
+### 3.3 Parameter-Efficient Fine-tuning with LoRA
+
+**LoRA (Low-Rank Adaptation)** allows fine-tuning Time-MoE with minimal trainable parameters, significantly reducing memory usage and training time while maintaining performance.
+
+#### 3.3.1 Basic LoRA Fine-tuning
+
+**Enable LoRA with default settings:**
+
+```bash
+python main.py -d <data_path> -m Maple728/TimeMoE-50M --use_lora
+```
+
+This will:
+- Apply LoRA to attention layers (q_proj, k_proj, v_proj, o_proj)
+- Use rank=8, alpha=16, dropout=0.05 (default values)
+- Train only ~0.5-1% of the total parameters
+
+#### 3.3.2 Custom LoRA Configuration
+
+**Adjust LoRA hyperparameters:**
+
+```bash
+python main.py -d <data_path> -m Maple728/TimeMoE-50M \
+  --use_lora \
+  --lora_r 16 \              # LoRA rank (higher = more capacity)
+  --lora_alpha 32 \           # LoRA scaling factor
+  --lora_dropout 0.05         # Dropout probability
+```
+
+**Recommended configurations:**
+
+| Use Case | Rank (r) | Alpha | Target Modules | Description |
+|----------|----------|-------|----------------|-------------|
+| Quick experiments | 4 | 8 | q_proj,v_proj | Minimal parameters, fast training |
+| Balanced (default) | 8 | 16 | q_proj,k_proj,v_proj,o_proj | Good performance/efficiency trade-off |
+| High capacity | 16 | 32 | q_proj,k_proj,v_proj,o_proj | Best performance, more parameters |
+
+#### 3.3.3 Custom Target Modules
+
+**Apply LoRA to specific layers:**
+
+```bash
+# Attention layers only (default)
+python main.py -d <data_path> --use_lora \
+  --lora_target_modules q_proj,k_proj,v_proj,o_proj
+
+# Attention + FFN layers
+python main.py -d <data_path> --use_lora \
+  --lora_target_modules q_proj,v_proj,gate_proj,down_proj
+
+# Full coverage (attention + all FFN layers)
+python main.py -d <data_path> --use_lora \
+  --lora_target_modules q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj
+```
+
+**Available target modules in Time-MoE:**
+- **Attention**: `q_proj`, `k_proj`, `v_proj`, `o_proj`
+- **FFN/MoE Experts**: `gate_proj`, `up_proj`, `down_proj`
+- **MoE Router**: `gate`
+- **Shared Expert**: `shared_expert`
+
+#### 3.3.4 Complete LoRA Example
+
+```bash
+python torch_dist_run.py main.py \
+  -d ./my_domain_data \
+  -m Maple728/TimeMoE-50M \
+  -o logs/lora_finetuned \
+  --use_lora \
+  --lora_r 8 \
+  --lora_alpha 16 \
+  --lora_dropout 0.05 \
+  --max_length 512 \
+  --stride 1 \
+  --global_batch_size 32 \
+  --num_train_epochs 5.0 \
+  --learning_rate 1e-4 \
+  --min_learning_rate 5e-5 \
+  --warmup_ratio 0.05 \
+  --save_strategy epoch \
+  --precision bf16
+```
+
+#### 3.3.5 LoRA Benefits
+
+**Memory Efficiency:**
+- Training with LoRA rank=8: ~0.5-1% trainable parameters
+- Significantly reduced GPU memory usage
+- Faster training and gradient computation
+
+**Performance:**
+- Comparable to full fine-tuning for most tasks
+- Better generalization on small datasets
+- Prevents catastrophic forgetting
+
+**Example: See [`examples/lora_finetuning_example.py`](examples/lora_finetuning_example.py) for detailed usage patterns.**
+
+### 3.4 Fine-tuning from Local Checkpoint
 
 To start from a local checkpoint:
 
