@@ -185,10 +185,16 @@ if __name__ == "__main__":
     print("=" * 80)
     
     try:
-        # Run examples
+        # Run non-model examples (model examples require downloading the model)
         example_lora_configurations()
         example_target_modules()
         example_training_commands()
+        
+        # Uncomment to run actual model examples (requires downloading the model)
+        # These are provided as reference but not run by default to avoid
+        # downloading large model files during example execution
+        # example_lora_inference()
+        # example_inference_test()
         
         print("\n" + "=" * 80)
         print("All examples completed!")
@@ -197,6 +203,8 @@ if __name__ == "__main__":
         print("  1. Install peft: pip install peft")
         print("  2. Prepare your dataset in jsonl format")
         print("  3. Run training with LoRA: python main.py -d <data_path> --use_lora")
+        print("\nFor hands-on model examples, uncomment the example_lora_inference()")
+        print("and example_inference_test() calls in this script.")
         print("\n")
         
     except Exception as e:

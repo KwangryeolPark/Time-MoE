@@ -14,6 +14,9 @@ from time_moe.trainer.hf_trainer import TimeMoETrainingArguments, TimeMoeTrainer
 from time_moe.utils.dist_util import get_world_size
 from time_moe.utils.log_util import logger, log_in_local_rank_0
 
+# Default LoRA target modules for Time-MoE
+DEFAULT_LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj"]
+
 
 class TimeMoeRunner:
     def __init__(
@@ -63,9 +66,9 @@ class TimeMoeRunner:
             try:
                 from peft import LoraConfig, get_peft_model, TaskType
                 
-                # Default target modules for Time-MoE attention layers
+                # Use default target modules if none specified
                 if lora_target_modules is None:
-                    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"]
+                    target_modules = DEFAULT_LORA_TARGET_MODULES
                 else:
                     target_modules = lora_target_modules
                 
