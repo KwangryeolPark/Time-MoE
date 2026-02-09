@@ -3,6 +3,7 @@ import math
 import random
 from functools import reduce
 from operator import mul
+from typing import Optional, List
 
 import torch
 
@@ -25,7 +26,9 @@ class TimeMoeRunner:
         self.output_path = output_path
         self.seed = seed
 
-    def load_model(self, model_path: str = None, from_scatch: bool = False, **kwargs):
+    def load_model(self, model_path: str = None, from_scatch: bool = False, use_lora: bool = False, 
+                   lora_r: int = 8, lora_alpha: int = 16, lora_dropout: float = 0.05,
+                   lora_target_modules: Optional[List[str]] = None, **kwargs):
         if model_path is None:
             model_path = self.model_path
         attn = kwargs.pop('attn_implementation', None)
@@ -54,6 +57,35 @@ class TimeMoeRunner:
             model = TimeMoeForPrediction(config)
         else:
             model = TimeMoeForPrediction.from_pretrained(model_path, **kwargs)
+        
+        # Apply LoRA if requested
+        if use_lora:
+            try:
+                from peft import LoraConfig, get_peft_model, TaskType
+                
+                # Default target modules for Time-MoE attention layers
+                if lora_target_modules is None:
+                    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"]
+                else:
+                    target_modules = lora_target_modules
+                
+                lora_config = LoraConfig(
+                    task_type=TaskType.CAUSAL_LM,
+                    r=lora_r,
+                    lora_alpha=lora_alpha,
+                    lora_dropout=lora_dropout,
+                    target_modules=target_modules,
+                    bias="none",
+                )
+                
+                model = get_peft_model(model, lora_config)
+                log_in_local_rank_0(f'LoRA enabled with r={lora_r}, alpha={lora_alpha}, dropout={lora_dropout}')
+                log_in_local_rank_0(f'Target modules: {target_modules}')
+                model.print_trainable_parameters()
+            except ImportError:
+                log_in_local_rank_0('PEFT library not found. Please install it with: pip install peft', type='error')
+                raise
+        
         return model
 
     def train_model(self, from_scratch: bool = False, **kwargs):
@@ -158,11 +190,28 @@ class TimeMoeRunner:
 
         model_path = train_config.pop('model_path', None) or self.model_path
         if model_path is not None:
+            # Extract LoRA configuration
+            use_lora = train_config.get('use_lora', False)
+            lora_r = train_config.get('lora_r', 8)
+            lora_alpha = train_config.get('lora_alpha', 16)
+            lora_dropout = train_config.get('lora_dropout', 0.05)
+            lora_target_modules_str = train_config.get('lora_target_modules', None)
+            
+            # Parse target modules if provided as comma-separated string
+            lora_target_modules = None
+            if lora_target_modules_str:
+                lora_target_modules = [m.strip() for m in lora_target_modules_str.split(',')]
+            
             model = self.load_model(
                 model_path=model_path,
                 from_scatch=from_scratch,
                 torch_dtype=torch_dtype,
                 attn_implementation=train_config.get('attn_implementation', 'eager'),
+                use_lora=use_lora,
+                lora_r=lora_r,
+                lora_alpha=lora_alpha,
+                lora_dropout=lora_dropout,
+                lora_target_modules=lora_target_modules,
             )
             log_in_local_rank_0(f'Load model parameters from: {model_path}')
         else:
