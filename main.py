@@ -144,6 +144,37 @@ if __name__ == "__main__":
         help="number of workers for dataloader",
     )
 
+    # LoRA arguments
+    parser.add_argument(
+        "--use_lora",
+        action="store_true",
+        help="Enable LoRA (Low-Rank Adaptation) for parameter-efficient fine-tuning",
+    )
+    parser.add_argument(
+        "--lora_r",
+        type=int,
+        default=8,
+        help="LoRA rank (default: 8)",
+    )
+    parser.add_argument(
+        "--lora_alpha",
+        type=int,
+        default=16,
+        help="LoRA alpha parameter (default: 16)",
+    )
+    parser.add_argument(
+        "--lora_dropout",
+        type=float,
+        default=0.05,
+        help="LoRA dropout probability (default: 0.05)",
+    )
+    parser.add_argument(
+        "--lora_target_modules",
+        type=str,
+        default=None,
+        help="Comma-separated list of module names to apply LoRA. Default: q_proj,k_proj,v_proj,o_proj",
+    )
+
     args = parser.parse_args()
 
     if args.normalization_method == "none":
@@ -187,4 +218,9 @@ if __name__ == "__main__":
         dataloader_num_workers=args.dataloader_num_workers,
         save_only_model=args.save_only_model,
         save_total_limit=args.save_total_limit,
+        use_lora=args.use_lora,
+        lora_r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
+        lora_target_modules=args.lora_target_modules,
     )

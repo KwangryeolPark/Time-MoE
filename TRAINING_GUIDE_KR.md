@@ -6,6 +6,7 @@
 1. [Pretrained Checkpoint 불러오기](#1-pretrained-checkpoint-불러오기)
 2. [Self-Supervised Learning (계속 학습)](#2-self-supervised-learning-계속-학습)
 3. [Fine-tuning](#3-fine-tuning)
+   - [LoRA를 활용한 효율적인 Fine-tuning](#33-lora를-활용한-효율적인-fine-tuning)
 4. [모델 저장 및 체크포인트 관리](#4-모델-저장-및-체크포인트-관리)
 
 ---
@@ -204,7 +205,104 @@ python torch_dist_run.py main.py \
 | 에포크 | 1-3 | 3-10 (더 많이) |
 | Stride | 512, 1024 (데이터 효율) | 1 (모든 샘플 활용) |
 
-### 3.3 로컬 체크포인트에서 Fine-tuning
+### 3.3 LoRA를 활용한 효율적인 Fine-tuning
+
+**LoRA (Low-Rank Adaptation)**는 최소한의 학습 가능한 파라미터만으로 Time-MoE를 fine-tuning할 수 있게 해주며, 메모리 사용량과 학습 시간을 크게 줄이면서도 성능을 유지합니다.
+
+#### 3.3.1 기본 LoRA Fine-tuning
+
+**기본 설정으로 LoRA 활성화:**
+
+```bash
+python main.py -d <data_path> -m Maple728/TimeMoE-50M --use_lora
+```
+
+이렇게 하면:
+- Attention 레이어(q_proj, k_proj, v_proj, o_proj)에 LoRA 적용
+- rank=8, alpha=16, dropout=0.05 (기본값) 사용
+- 전체 파라미터의 약 0.5-1%만 학습
+
+#### 3.3.2 커스텀 LoRA 설정
+
+**LoRA 하이퍼파라미터 조정:**
+
+```bash
+python main.py -d <data_path> -m Maple728/TimeMoE-50M \
+  --use_lora \
+  --lora_r 16 \              # LoRA rank (높을수록 더 많은 용량)
+  --lora_alpha 32 \           # LoRA 스케일링 팩터
+  --lora_dropout 0.05         # Dropout 확률
+```
+
+**권장 설정:**
+
+| 사용 사례 | Rank (r) | Alpha | Target Modules | 설명 |
+|----------|----------|-------|----------------|------|
+| 빠른 실험 | 4 | 8 | q_proj,v_proj | 최소 파라미터, 빠른 학습 |
+| 균형잡힌 설정 (기본) | 8 | 16 | q_proj,k_proj,v_proj,o_proj | 좋은 성능/효율성 균형 |
+| 높은 용량 | 16 | 32 | q_proj,k_proj,v_proj,o_proj | 최고 성능, 더 많은 파라미터 |
+
+#### 3.3.3 커스텀 타겟 모듈
+
+**특정 레이어에만 LoRA 적용:**
+
+```bash
+# Attention 레이어만 (기본값)
+python main.py -d <data_path> --use_lora \
+  --lora_target_modules q_proj,k_proj,v_proj,o_proj
+
+# Attention + FFN 레이어
+python main.py -d <data_path> --use_lora \
+  --lora_target_modules q_proj,v_proj,gate_proj,down_proj
+
+# 전체 커버리지 (attention + 모든 FFN 레이어)
+python main.py -d <data_path> --use_lora \
+  --lora_target_modules q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj
+```
+
+**Time-MoE에서 사용 가능한 타겟 모듈:**
+- **Attention**: `q_proj`, `k_proj`, `v_proj`, `o_proj`
+- **FFN/MoE Experts**: `gate_proj`, `up_proj`, `down_proj`
+- **MoE Router**: `gate`
+- **Shared Expert**: `shared_expert`
+
+#### 3.3.4 완전한 LoRA 예제
+
+```bash
+python torch_dist_run.py main.py \
+  -d ./my_domain_data \
+  -m Maple728/TimeMoE-50M \
+  -o logs/lora_finetuned \
+  --use_lora \
+  --lora_r 8 \
+  --lora_alpha 16 \
+  --lora_dropout 0.05 \
+  --max_length 512 \
+  --stride 1 \
+  --global_batch_size 32 \
+  --num_train_epochs 5.0 \
+  --learning_rate 1e-4 \
+  --min_learning_rate 5e-5 \
+  --warmup_ratio 0.05 \
+  --save_strategy epoch \
+  --precision bf16
+```
+
+#### 3.3.5 LoRA의 장점
+
+**메모리 효율성:**
+- LoRA rank=8로 학습 시: 전체 파라미터의 약 0.5-1%만 학습
+- GPU 메모리 사용량 크게 감소
+- 더 빠른 학습과 gradient 계산
+
+**성능:**
+- 대부분의 작업에서 전체 fine-tuning과 비슷한 성능
+- 작은 데이터셋에서 더 나은 일반화
+- Catastrophic forgetting 방지
+
+**예제: 자세한 사용 패턴은 [`examples/lora_finetuning_example.py`](examples/lora_finetuning_example.py)를 참조하세요.**
+
+### 3.4 로컬 체크포인트에서 Fine-tuning
 
 이미 학습한 로컬 체크포인트에서 시작하려면:
 

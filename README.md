@@ -33,6 +33,7 @@
 ## TODO List
 - [ ] Add covariate support
 - [ ] Enable fine-tuning of Time-MoE for forecasting with dynamic features and support time series classification
+- [x] LoRA (Low-Rank Adaptation) support for parameter-efficient fine-tuning
 
 ## Updates/News:
 
@@ -242,6 +243,31 @@ To train Time-MoE **from scratch**, simply include the `--from_scratch` argument
 ```bash
 python torch_dist_run.py main.py -d <data_path> --from_scratch
 ```
+
+### Parameter-Efficient Fine-tuning with LoRA
+
+Time-MoE now supports **LoRA (Low-Rank Adaptation)** for memory-efficient fine-tuning. LoRA allows you to fine-tune the model by training only 0.5-1% of the total parameters, significantly reducing memory usage and training time while maintaining performance.
+
+**Basic LoRA fine-tuning:**
+
+```bash
+python main.py -d <data_path> --use_lora
+```
+
+**Custom LoRA configuration:**
+
+```bash
+python main.py -d <data_path> \
+  --use_lora \
+  --lora_r 8 \              # LoRA rank (default: 8)
+  --lora_alpha 16 \          # LoRA alpha (default: 16)
+  --lora_dropout 0.05 \      # LoRA dropout (default: 0.05)
+  --lora_target_modules q_proj,k_proj,v_proj,o_proj
+```
+
+For more details on LoRA fine-tuning, see:
+- **[Training Guide](TRAINING_GUIDE.md#33-parameter-efficient-fine-tuning-with-lora)** - Comprehensive LoRA usage guide
+- **[Example Script](examples/lora_finetuning_example.py)** - Detailed examples and configurations
 
 To explore additional command-line arguments and their usage, invoke the help command:
 
