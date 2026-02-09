@@ -1105,6 +1105,98 @@ class TimeMoeForPrediction(TimeMoePreTrainedModel, TSGenerationMixin):
 
         return loss
 
+    def encode(
+            self,
+            input_ids: torch.FloatTensor = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.LongTensor] = None,
+            inputs_embeds: Optional[torch.FloatTensor] = None,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = True,
+            return_dict: Optional[bool] = True,
+    ):
+        """
+        Extract latent representations (hidden states) from the input time series.
+        
+        This method processes the input through the Time-MoE encoder and returns the latent
+        representations at each layer. The final hidden state represents the most refined
+        representation of the input time series.
+        
+        Args:
+            input_ids (`torch.FloatTensor` of shape `(batch_size, sequence_length)` or `(batch_size, sequence_length, input_size)`):
+                The input time series data. If 2D, will be unsqueezed to 3D with input_size=1.
+            attention_mask (`torch.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
+                - 1 for tokens that are **not masked**,
+                - 0 for tokens that are **masked**.
+            position_ids (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Indices of positions of each input sequence tokens in the position embeddings.
+            inputs_embeds (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
+                Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation.
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers.
+            output_hidden_states (`bool`, *optional*, defaults to `True`):
+                Whether or not to return the hidden states of all layers.
+            return_dict (`bool`, *optional*, defaults to `True`):
+                Whether or not to return a `MoeModelOutputWithPast` instead of a plain tuple.
+        
+        Returns:
+            `MoeModelOutputWithPast` if `return_dict=True`, otherwise a tuple. The output contains:
+            - `last_hidden_state` (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
+                The final layer hidden states, representing the latent representation.
+            - `hidden_states` (`tuple(torch.FloatTensor)`, *optional*, returned when `output_hidden_states=True`):
+                Hidden states of the model at each layer plus the initial embedding outputs.
+            - `attentions` (`tuple(torch.FloatTensor)`, *optional*, returned when `output_attentions=True`):
+                Attentions weights after the attention softmax.
+            - `router_logits` (`tuple(torch.FloatTensor)`):
+                Router logits from the mixture of experts layers.
+        
+        Example:
+            ```python
+            import torch
+            from transformers import AutoModelForCausalLM
+            
+            # Load model
+            model = AutoModelForCausalLM.from_pretrained(
+                'Maple728/TimeMoE-50M',
+                device_map="cpu",
+                trust_remote_code=True,
+            )
+            
+            # Prepare input
+            context_length = 12
+            seqs = torch.randn(2, context_length)  # [batch_size, context_length]
+            
+            # Normalize
+            mean, std = seqs.mean(dim=-1, keepdim=True), seqs.std(dim=-1, keepdim=True)
+            normed_seqs = (seqs - mean) / std
+            
+            # Extract latent representation
+            outputs = model.encode(normed_seqs)
+            latent_representation = outputs.last_hidden_state  # [batch_size, context_length, hidden_size]
+            
+            # You can also access intermediate layer representations
+            all_layer_outputs = outputs.hidden_states  # tuple of hidden states from all layers
+            ```
+        """
+        # Set output_hidden_states to True by default for this method
+        output_hidden_states = True if output_hidden_states is None else output_hidden_states
+        return_dict = True if return_dict is None else return_dict
+        
+        # Call the underlying model to get hidden states
+        outputs = self.model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            inputs_embeds=inputs_embeds,
+            use_cache=False,  # We don't need cache for encoding
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        
+        return outputs
+
     def prepare_inputs_for_generation(
             self, input_ids, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
     ):

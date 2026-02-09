@@ -144,6 +144,34 @@ output = model.generate(normed_seqs, max_new_tokens=prediction_length)
 predictions = output[:, -prediction_length:] * std + mean
 ```
 
+## Extract Latent Representations
+
+```python
+import torch
+from transformers import AutoModelForCausalLM
+
+# Load model
+model = AutoModelForCausalLM.from_pretrained(
+    'Maple728/TimeMoE-50M',
+    device_map="cpu",
+    trust_remote_code=True,
+)
+
+# Prepare and normalize input
+seqs = torch.randn(2, 12)
+mean, std = seqs.mean(dim=-1, keepdim=True), seqs.std(dim=-1, keepdim=True)
+normed_seqs = (seqs - mean) / std
+
+# Extract latent representation
+outputs = model.encode(normed_seqs)
+latent = outputs.last_hidden_state  # [batch, seq_len, hidden_size]
+
+# Optional: mean pooling for fixed-size representation
+pooled = latent.mean(dim=1)  # [batch, hidden_size]
+```
+
+See [examples/extract_latent_representation.py](examples/extract_latent_representation.py) for more examples.
+
 ## Troubleshooting
 
 ### Out of Memory

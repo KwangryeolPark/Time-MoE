@@ -177,6 +177,95 @@ output = model.generate(normed_seqs, max_new_tokens=prediction_length)  # shape 
 normed_predictions = output[:, -prediction_length:]  # shape is [batch_size, 6]
 ```
 
+### 🔍 Extracting Latent Representations
+
+Time-MoE can extract latent representations (embeddings) from time series data, which can be used for various downstream tasks such as clustering, classification, similarity search, and anomaly detection.
+
+#### Using the `encode()` method (Recommended)
+
+The simplest way to extract latent representations is using the `encode()` method:
+
+```python
+import torch
+from transformers import AutoModelForCausalLM
+
+# Load model
+model = AutoModelForCausalLM.from_pretrained(
+    'Maple728/TimeMoE-50M',
+    device_map="cpu",
+    trust_remote_code=True,
+)
+
+# Prepare input
+context_length = 12
+seqs = torch.randn(2, context_length)  # [batch_size, context_length]
+
+# Normalize
+mean, std = seqs.mean(dim=-1, keepdim=True), seqs.std(dim=-1, keepdim=True)
+normed_seqs = (seqs - mean) / std
+
+# Extract latent representation
+outputs = model.encode(normed_seqs)
+latent_repr = outputs.last_hidden_state  # shape: [batch_size, context_length, hidden_size]
+
+# Optional: Use mean pooling to get a fixed-size representation per sequence
+pooled_repr = latent_repr.mean(dim=1)  # shape: [batch_size, hidden_size]
+```
+
+#### Accessing Intermediate Layer Representations
+
+You can also access representations from intermediate layers:
+
+```python
+# Extract representations with all layer outputs
+outputs = model.encode(normed_seqs)
+
+# outputs.hidden_states is a tuple containing hidden states from all layers
+# First element: after input embedding
+# Last element: final layer output (same as outputs.last_hidden_state)
+num_layers = len(outputs.hidden_states)
+print(f"Number of layers: {num_layers}")
+
+# Access specific layer
+middle_layer = outputs.hidden_states[num_layers // 2]
+final_layer = outputs.hidden_states[-1]
+```
+
+#### Using `forward()` method
+
+Alternatively, you can use the `forward()` method with `output_hidden_states=True`:
+
+```python
+outputs = model.forward(
+    input_ids=normed_seqs,
+    output_hidden_states=True,
+    return_dict=True,
+)
+latent_repr = outputs.hidden_states[-1]  # Get final layer representation
+```
+
+#### Common Use Cases
+
+1. **Time Series Similarity**: Compare representations using cosine similarity
+```python
+similarity = torch.nn.functional.cosine_similarity(pooled_repr[0], pooled_repr[1], dim=0)
+```
+
+2. **Clustering**: Use representations as features for clustering algorithms
+```python
+from sklearn.cluster import KMeans
+kmeans = KMeans(n_clusters=3)
+cluster_labels = kmeans.fit_predict(pooled_repr.detach().cpu().numpy())
+```
+
+3. **Classification**: Train a classifier on top of the representations
+```python
+classifier = torch.nn.Linear(model.config.hidden_size, num_classes)
+logits = classifier(pooled_repr)
+```
+
+For more detailed examples, see [examples/extract_latent_representation.py](examples/extract_latent_representation.py).
+
 ### Evaluation
 
 + Prepare the benchmark datasets.

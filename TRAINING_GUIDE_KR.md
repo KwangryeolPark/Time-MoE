@@ -7,6 +7,7 @@
 2. [Self-Supervised Learning (계속 학습)](#2-self-supervised-learning-계속-학습)
 3. [Fine-tuning](#3-fine-tuning)
 4. [모델 저장 및 체크포인트 관리](#4-모델-저장-및-체크포인트-관리)
+5. [Latent Representation (잠재 표현) 추출하기](#5-latent-representation-잠재-표현-추출하기)
 
 ---
 
@@ -525,6 +526,121 @@ python run_eval.py \
   -d dataset/ETT-small/ETTh1.csv \
   -p 96
 ```
+
+---
+
+## 5. Latent Representation (잠재 표현) 추출하기
+
+Time-MoE 모델에서 시계열 데이터의 잠재 표현(hidden states)을 추출할 수 있습니다. 이는 클러스터링, 분류, 유사도 검색, 이상 탐지 등 다양한 다운스트림 작업에 활용할 수 있습니다.
+
+### 5.1 `encode()` 메서드 사용 (권장)
+
+가장 간단한 방법은 `encode()` 메서드를 사용하는 것입니다:
+
+```python
+import torch
+from transformers import AutoModelForCausalLM
+
+# 모델 불러오기
+model = AutoModelForCausalLM.from_pretrained(
+    'Maple728/TimeMoE-50M',
+    device_map="cpu",
+    trust_remote_code=True,
+)
+
+# 입력 데이터 준비
+context_length = 12
+seqs = torch.randn(2, context_length)  # [batch_size, context_length]
+
+# 정규화
+mean, std = seqs.mean(dim=-1, keepdim=True), seqs.std(dim=-1, keepdim=True)
+normed_seqs = (seqs - mean) / std
+
+# 잠재 표현 추출
+outputs = model.encode(normed_seqs)
+latent_repr = outputs.last_hidden_state  # shape: [batch_size, context_length, hidden_size]
+
+# 선택사항: 시퀀스당 고정 크기 표현을 얻기 위해 평균 풀링 사용
+pooled_repr = latent_repr.mean(dim=1)  # shape: [batch_size, hidden_size]
+```
+
+### 5.2 중간 레이어 표현 접근
+
+모든 레이어의 출력에 접근할 수도 있습니다:
+
+```python
+# 모든 레이어 출력과 함께 표현 추출
+outputs = model.encode(normed_seqs)
+
+# outputs.hidden_states는 모든 레이어의 hidden states를 포함하는 튜플입니다
+# 첫 번째 요소: 입력 임베딩 이후
+# 마지막 요소: 최종 레이어 출력 (outputs.last_hidden_state와 동일)
+num_layers = len(outputs.hidden_states)
+print(f"레이어 수: {num_layers}")
+
+# 특정 레이어 접근
+middle_layer = outputs.hidden_states[num_layers // 2]
+final_layer = outputs.hidden_states[-1]
+```
+
+### 5.3 `forward()` 메서드 사용
+
+또는 `output_hidden_states=True`와 함께 `forward()` 메서드를 사용할 수 있습니다:
+
+```python
+outputs = model.forward(
+    input_ids=normed_seqs,
+    output_hidden_states=True,
+    return_dict=True,
+)
+latent_repr = outputs.hidden_states[-1]  # 최종 레이어 표현 가져오기
+```
+
+### 5.4 일반적인 사용 사례
+
+#### 1. 시계열 유사도
+
+```python
+# 코사인 유사도를 사용하여 표현 비교
+similarity = torch.nn.functional.cosine_similarity(pooled_repr[0], pooled_repr[1], dim=0)
+```
+
+#### 2. 클러스터링
+
+```python
+# 클러스터링 알고리즘의 특징으로 표현 사용
+from sklearn.cluster import KMeans
+kmeans = KMeans(n_clusters=3)
+cluster_labels = kmeans.fit_predict(pooled_repr.detach().cpu().numpy())
+```
+
+#### 3. 분류
+
+```python
+# 표현 위에 분류기 학습
+classifier = torch.nn.Linear(model.config.hidden_size, num_classes)
+logits = classifier(pooled_repr)
+```
+
+#### 4. 이상 탐지
+
+```python
+# 정상 데이터의 표현 추출
+normal_reprs = []
+for normal_seq in normal_sequences:
+    outputs = model.encode(normal_seq)
+    normal_reprs.append(outputs.last_hidden_state.mean(dim=1))
+
+# 정상 표현의 평균 계산
+normal_center = torch.cat(normal_reprs).mean(dim=0)
+
+# 새로운 시퀀스가 정상에서 얼마나 벗어났는지 확인
+new_outputs = model.encode(new_sequence)
+new_repr = new_outputs.last_hidden_state.mean(dim=1)
+distance = torch.dist(new_repr, normal_center)
+```
+
+더 자세한 예제는 [examples/extract_latent_representation.py](examples/extract_latent_representation.py)를 참조하세요.
 
 ---
 
