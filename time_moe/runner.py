@@ -26,7 +26,7 @@ class TimeMoeRunner:
         self.output_path = output_path
         self.seed = seed
 
-    def load_model(self, model_path: str = None, from_scatch: bool = False, use_lora: bool = False, 
+    def load_model(self, model_path: str = None, from_scratch: bool = False, use_lora: bool = False, 
                    lora_r: int = 8, lora_alpha: int = 16, lora_dropout: float = 0.05,
                    lora_target_modules: Optional[List[str]] = None, **kwargs):
         if model_path is None:
@@ -52,7 +52,7 @@ class TimeMoeRunner:
             raise ValueError(f'Unknown attention method: {attn}')
         kwargs['attn_implementation'] = attn
 
-        if from_scatch:
+        if from_scratch:
             config = TimeMoeConfig.from_pretrained(model_path, _attn_implementation=attn)
             model = TimeMoeForPrediction(config)
         else:
@@ -204,7 +204,7 @@ class TimeMoeRunner:
             
             model = self.load_model(
                 model_path=model_path,
-                from_scatch=from_scratch,
+                from_scratch=from_scratch,
                 torch_dtype=torch_dtype,
                 attn_implementation=train_config.get('attn_implementation', 'eager'),
                 use_lora=use_lora,
