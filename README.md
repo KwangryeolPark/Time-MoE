@@ -78,6 +78,8 @@ This code snippet shows how to load a random data sequence from the Time-300B da
 
 For detailed guides on training and using Time-MoE:
 
+- **[Quick Reference](QUICK_REFERENCE.md)** - Quick command reference and common use cases
+
 - **[Training Guide (English)](TRAINING_GUIDE.md)** - Comprehensive guide on:
   - Loading pretrained checkpoints
   - Self-supervised learning (continued pretraining)
