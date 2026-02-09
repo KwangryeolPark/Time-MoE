@@ -74,6 +74,24 @@ seq = ds[seq_idx]
 
 This code snippet shows how to load a random data sequence from the Time-300B dataset. First, download the dataset to the local 'Time-300B' folder, import the TimeMoEDataset class from time_moe.datasets, instantiate the class, and finally retrieve a sequence using a random index.
 
+## 📖 Training Guides
+
+For detailed guides on training and using Time-MoE:
+
+- **[Quick Reference](QUICK_REFERENCE.md)** - Quick command reference and common use cases
+
+- **[Training Guide (English)](TRAINING_GUIDE.md)** - Comprehensive guide on:
+  - Loading pretrained checkpoints
+  - Self-supervised learning (continued pretraining)
+  - Fine-tuning on custom datasets
+  - Checkpoint management and advanced settings
+
+- **[학습 가이드 (한국어)](TRAINING_GUIDE_KR.md)** - 한국어로 작성된 상세 가이드:
+  - Pretrained checkpoint 불러오기
+  - Self-supervised learning (계속 학습)
+  - Fine-tuning 방법
+  - 체크포인트 관리 및 고급 설정
+
 ## 🚀 Getting Started
 
 ### Installation
