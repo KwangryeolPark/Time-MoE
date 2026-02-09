@@ -56,7 +56,7 @@ The `load_model()` method works as follows:
 # Reference: runner.py load_model method
 model = runner.load_model(
     model_path='Maple728/TimeMoE-50M',
-    from_scatch=False,  # False: use pretrained weights
+    from_scratch=False,  # False: use pretrained weights
     attn_implementation='auto'  # 'auto', 'eager', 'flash_attention_2'
 )
 ```
@@ -136,7 +136,7 @@ When you run `main.py`, the following happens:
    # From runner.py train_model method
    model = self.load_model(
        model_path=args.model_path,
-       from_scatch=from_scratch,  # False loads pretrained weights
+       from_scratch=from_scratch,  # False loads pretrained weights
        torch_dtype=torch_dtype,
        attn_implementation=train_config.get('attn_implementation', 'eager'),
    )

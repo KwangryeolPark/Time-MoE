@@ -56,7 +56,7 @@ runner = TimeMoeRunner(
 # runner.py의 load_model 메서드 참고
 model = runner.load_model(
     model_path='Maple728/TimeMoE-50M',
-    from_scatch=False,  # False: pretrained 가중치 사용
+    from_scratch=False,  # False: pretrained 가중치 사용
     attn_implementation='auto'  # 'auto', 'eager', 'flash_attention_2'
 )
 ```
@@ -137,7 +137,7 @@ JSON 또는 pickle 형식도 지원됩니다.
    # runner.py의 train_model 메서드에서
    model = self.load_model(
        model_path=args.model_path,
-       from_scatch=from_scratch,  # False인 경우 pretrained 사용
+       from_scratch=from_scratch,  # False인 경우 pretrained 사용
        torch_dtype=torch_dtype,
        attn_implementation=train_config.get('attn_implementation', 'eager'),
    )
